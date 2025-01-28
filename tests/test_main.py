@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+from fastapi.testclient import TestClient
 from main import app
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
@@ -14,11 +15,11 @@ engine = create_engine(DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-@pytest.fixture(scope="module")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# @pytest.fixture(scope="module")
+# def event_loop():
+#     loop = asyncio.new_event_loop()
+#     yield loop
+#     loop.close()
 
 @pytest.fixture(scope="module")
 def test_app():
@@ -33,55 +34,28 @@ async def async_client(test_app):
 
 @pytest.mark.asyncio
 async def test_register_and_login(async_client):
-    async with AsyncClient(base_url="http://testserver") as ac:
-        response = await ac.post(
-            "/register",
-            json={
-                "username": "testuser",
-                "email": "testuser@example.com",
-                "password": "testpassword",
-            },
-        )
-        assert response.status_code == 303
+    response = await async_client.post(
+        "/register",
+        json={
+            "username": "testuser",
+            "email": "testuser@example.com",
+            "password": "testpassword",
+        },
+    )
+    assert response.status_code == 201
 
-        response = await ac.post(
-            "/login", json={"username": "testuser", "password": "testpassword"}
-        )
-        assert response.status_code == 303
+    response = await async_client.post(
+        "/login",
+        json={"username": "testuser", "password": "testpassword"}
+    )
+    assert response.status_code == 200
 
-        cookies = response.cookies.jar
-        assert any(cookie.name == "access_token" for cookie in cookies)
+    cookies = response.cookies.jar
+    assert any(cookie.name == "access_token" for cookie in cookies)
 
-        response = await ac.get("/", cookies=response.cookies)
-        assert response.status_code == 200
-        assert "Привет, testuser" in response.text
-
-# @pytest.mark.asyncio
-# async def test_register_and_login(test_app):
-#     async with AsyncClient(app=test_app, base_url="http://testserver") as ac:
-#         response = await ac.post(
-#             "/register",
-#             data={
-#                 "username": "testuser",
-#                 "email": "testuser@example.com",
-#                 "password": "testpassword",
-#             },
-#         )
-#         assert (
-#             response.status_code == 303
-#         )
-#
-#         response = await ac.post(
-#             "/login", data={"username": "testuser", "password": "testpassword"}
-#         )
-#         assert response.status_code == 303
-#
-#         cookies = response.cookies.jar
-#         assert any(cookie.name == "access_token" for cookie in cookies)
-#
-#         response = await ac.get("/", cookies=response.cookies)
-#         assert response.status_code == 200
-#         assert "Привет, testuser" in response.text
+    response = await async_client.get("/", cookies=response.cookies)
+    assert response.status_code == 200
+    assert "Привет, testuser" in response.text
 
 
 @pytest.mark.asyncio
