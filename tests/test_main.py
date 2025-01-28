@@ -21,97 +21,59 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 #     yield loop
 #     loop.close()
 
-@pytest.fixture(scope="module")
-def test_app():
-    Base.metadata.create_all(bind=engine)
-    yield app
-    Base.metadata.drop_all(bind=engine)
+# @pytest.fixture(scope="module")
+# def test_app():
+#     Base.metadata.create_all(bind=engine)
+#     yield app
+#     Base.metadata.drop_all(bind=engine)
+#
+# @pytest.fixture(scope="function")
+# def async_client():
+#     with TestClient(app) as client:
+#         yield client
+#
+# @pytest.mark.asyncio
+# async def test_register_and_login(async_client):
+#     response = await async_client.post(
+#         "/register",
+#         json={
+#             "username": "testuser",
+#             "email": "testuser@example.com",
+#             "password": "testpassword",
+#         },
+#     )
+#     assert response.status_code == 201
+#
+#     response = await async_client.post(
+#         "/login",
+#         json={"username": "testuser", "password": "testpassword"}
+#     )
+#     assert response.status_code == 200
+#
+#     cookies = response.cookies
+#     assert "access_token" in cookies
+#
+#     response = await async_client.get("/", cookies=cookies)
+#     assert response.status_code == 200
+#     assert "Привет, testuser" in response.text
 
-@pytest.fixture(scope="function")
-def async_client():
-    with TestClient(app) as client:
-        yield client
+
+
+
+import pytest
+from httpx import AsyncClient, ASGITransport
+
+from main import app
+
 
 @pytest.mark.asyncio
-async def test_register_and_login(async_client):
-    response = await async_client.post(
-        "/register",
-        json={
-            "username": "testuser",
-            "email": "testuser@example.com",
-            "password": "testpassword",
-        },
-    )
-    assert response.status_code == 201
-
-    response = await async_client.post(
-        "/login",
-        json={"username": "testuser", "password": "testpassword"}
-    )
+async def test_read_root():
+    async with AsyncClient(
+        transport=ASGITransport(app), base_url="http://testserver"
+    ) as ac:
+        response = await ac.get("/")
     assert response.status_code == 200
-
-    cookies = response.cookies
-    assert "access_token" in cookies
-
-    response = await async_client.get("/", cookies=cookies)
-    assert response.status_code == 200
-    assert "Привет, testuser" in response.text
-
-# ДОРАБОТАТЬ
-# @pytest.mark.asyncio
-# async def test_access_protected_route(async_client):
-#     async with AsyncClient(app=async_client, base_url="http://testserver") as ac:
-#         response = await ac.post(
-#             "/add_sale",
-#             data={"sale_date": "2025-01-01", "quantity": 10, "item_id": 1},
-#         )
-#         assert response.status_code == 401
-#
-#         await ac.post(
-#             "/login", data={"username": "testuser", "password": "testpassword"}
-#         )
-#
-#         response = await ac.post(
-#             "/add_sale",
-#             data={"sale_date": "2025-01-01", "quantity": 10, "item_id": 1},
-#         )
-#         assert (
-#             response.status_code == 403
-#         )
-#
-# ДОРАБОТАТЬ
-# @pytest.mark.asyncio
-# async def test_admin_access(async_client):
-#     async with AsyncClient(app=async_client, base_url="http://testserver") as ac:
-#         response = await ac.post(
-#             "/login", data={"username": "admin", "password": "admin"}
-#         )
-#         assert response.status_code == 303
-#
-#         response = await ac.post(
-#             "/add_sale",
-#             data={"sale_date": "2025-01-01", "quantity": 10, "item_id": 1},
-#         )
-#         assert response.status_code == 303
-#
-#         response = await ac.get("/", cookies=response.cookies)
-#         assert "2025-01-01" in response.text
-
-
-# import pytest
-# from httpx import AsyncClient, ASGITransport
-#
-# from main import app
-#
-#
-# @pytest.mark.asyncio
-# async def test_read_root():
-#     async with AsyncClient(
-#         transport=ASGITransport(app), base_url="http://testserver"
-#     ) as ac:
-#         response = await ac.get("/")
-#     assert response.status_code == 200
-#     assert "Прогноз продаж на следующие 20 дней" in response.text
+    assert "Прогноз продаж на следующие 20 дней" in response.text
 #
 #
 # @pytest.mark.asyncio
