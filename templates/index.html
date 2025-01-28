@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>Прогноз продаж</title>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        td, th {
+            padding: 0.25rem !important;  /* Уменьшаем отступы */
+        }
+    </style>
+
+</head>
+
+<body class="container-fluid">
+
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <a class="navbar-brand" href="/">Продажи и Прогноз</a>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ml-auto">
+          {% if current_user %}
+          <li class="nav-item">
+            <span class="navbar-text">Привет, {{ current_user.username }}</span>
+            <form action="/logout" method="post" style="display:inline;">
+              <button type="submit" class="btn btn-danger ml-2">Выйти</button>
+            </form>
+          </li>
+          {% else %}
+          <li class="nav-item">
+            <form id="login-form" class="form-inline" action="/login" method="post">
+              <input type="text" name="username" class="form-control mr-2" placeholder="Логин" required>
+              <input type="password" name="password" class="form-control mr-2" placeholder="Пароль" required>
+              <button type="submit" class="btn btn-primary">Войти</button>
+            </form>
+          </li>
+          {% endif %}
+        </ul>
+      </div>
+    </nav>
+
+
+    <script>
+    async function loginUser(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+
+        const response = await fetch('/register', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('login-section').style.display = 'none'; // Скрываем форму логина
+            document.getElementById('username-display').innerText = Привет, ${data.username}; // Отображаем логин
+            document.getElementById('user-section').style.display = 'flex'; // Показываем секцию пользователя
+        } else {
+            alert('Неверные учетные данные');
+        }
+    }
+
+    async function logoutUser() {
+        // Здесь вы можете добавить логику для выхода пользователя, например, удаление токена из localStorage
+        // или отправка запроса на сервер для разлогинивания.
+
+        // Пример:
+        // await fetch('/logout', { method: 'POST' }); // Эндпоинт для разлогинивания (при необходимости)
+
+        document.getElementById('login-section').style.display = 'block'; // Показываем форму логина
+        document.getElementById('user-section').style.display = 'none'; // Скрываем секцию пользователя
+    }
+    </script>
+
+    <h1 class="my-4 text-center">Прогноз продаж на следующие 20 дней</h1>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h2>Добавить новые данные о продажах</h2>
+            <form action="/add_sale" method="post" class="mb-4">
+                <div class="form-group">
+                    <label for="sale_date">Дата продажи:</label>
+                    <input type="date" id="sale_date" name="sale_date" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Количество:</label>
+                    <input type="number" id="quantity" name="quantity" min="1" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="item_id">ID Товара:</label>
+                    <input type="number" id="item_id" name="item_id" min="1" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Добавить продажу</button>
+            </form>
+        </div>
+        <div class="col-md-6">
+            <h2>График прогноза</h2>
+            <div class="chart-container" style="position: relative; height:400px; width:100%">
+                <canvas id="forecastChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+
+        <div class="col-md-6">
+            <h2>Прошлые продажи</h2>
+            <table class="table table-bordered table-sm">
+                <thead>
+                    <tr>
+                        <th>ID Товара</th> <!-- Добавлено -->
+                        <th>Дата</th>
+                        <th>Количество</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in past_sales %}
+                    <tr>
+                        <td>{{ item.item_id }}</td> <!-- Добавлено -->
+                        <td>{{ item.date }}</td>
+                        <td>{{ item.quantity }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="col-md-6">
+            <h2>Прогноз на будущее</h2>
+            <table class="table table-bordered table-sm">
+                <thead>
+                    <tr>
+                        <th>ID Товара</th> <!-- Добавлено -->
+                        <th>Дата</th>
+                        <th>Прогнозируемое количество</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in forecast %}
+                    <tr>
+                        <td>{{ item.item_id }}</td>
+                        <td>{{ item.date }}</td>
+                        <td>{{ item.predicted_quantity }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Данные для графика
+        const labels = {{ forecast | map(attribute='date') | list | tojson }};
+        const data = {{ forecast | map(attribute='predicted_quantity') | list | tojson }};
+
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        const forecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Прогнозируемые продажи',
+                    data: data,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true,
+                    tension: 0.4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Дата',
+                        },
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Количество',
+                        },
+                        beginAtZero: true,
+                    }
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>

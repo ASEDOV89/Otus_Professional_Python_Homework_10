@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Прогноз продаж</title>
+</head>
+<body>
+    <h1>Прогноз продаж на следующие 20 дней</h1>
+    <table border="1">
+        <tr>
+            <th>Дата</th>
+            <th>Прогнозируемое количество</th>
+        </tr>
+        {% for item in forecast %}
+        <tr>
+            <td>{{ item.date }}</td>
+            <td>{{ item.predicted_quantity }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
