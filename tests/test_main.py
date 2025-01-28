@@ -118,3 +118,4 @@ async def test_admin_access():
 
         response = await ac.get("/", cookies=response.cookies)
         assert "2025-01-01" in response.text
+
