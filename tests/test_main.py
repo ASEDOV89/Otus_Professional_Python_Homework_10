@@ -41,7 +41,7 @@ async def test_register_and_login(test_app):
         )
         assert (
             response.status_code == 303
-        )  # Redirect после успешной регистрации
+        )
 
         response = await ac.post(
             "/login", data={"username": "testuser", "password": "testpassword"}
@@ -75,7 +75,7 @@ async def test_access_protected_route(test_app):
         )
         assert (
             response.status_code == 403
-        )  # Forbidden, так как у пользователя нет роли admin
+        )
 
 
 @pytest.mark.asyncio
