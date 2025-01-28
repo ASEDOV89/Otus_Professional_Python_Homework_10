@@ -13,12 +13,12 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 @pytest.fixture(scope="module")
 def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
-
 
 @pytest.fixture(scope="module")
 def test_app():
@@ -26,9 +26,13 @@ def test_app():
     yield app
     Base.metadata.drop_all(bind=engine)
 
+@pytest.fixture(scope="function")
+async def async_client(test_app):
+    async with AsyncClient(app=test_app, base_url="http://test") as client:
+        yield client
 
 @pytest.mark.asyncio
-async def test_register_and_login(test_app):
+async def test_register_and_login(async_client):
     async with AsyncClient(base_url="http://testserver") as ac:
         response = await ac.post(
             "/register",
@@ -81,8 +85,8 @@ async def test_register_and_login(test_app):
 
 
 @pytest.mark.asyncio
-async def test_access_protected_route(test_app):
-    async with AsyncClient(app=test_app, base_url="http://testserver") as ac:
+async def test_access_protected_route(async_client):
+    async with AsyncClient(app=async_client, base_url="http://testserver") as ac:
         response = await ac.post(
             "/add_sale",
             data={"sale_date": "2025-01-01", "quantity": 10, "item_id": 1},
@@ -103,8 +107,8 @@ async def test_access_protected_route(test_app):
 
 
 @pytest.mark.asyncio
-async def test_admin_access(test_app):
-    async with AsyncClient(app=test_app, base_url="http://testserver") as ac:
+async def test_admin_access(async_client):
+    async with AsyncClient(app=async_client, base_url="http://testserver") as ac:
         response = await ac.post(
             "/login", data={"username": "admin", "password": "admin"}
         )
