@@ -25,10 +25,27 @@ async def test_read_root():
 
 #==========================================
 
+from sqlalchemy.orm import Session
+from models import UserModel, RoleModel
+
+def create_test_user(db: Session, username: str = "admin", password: str = "admin", role_name: str = "admin"):
+    role = RoleModel(name=role_name)
+    db.add(role)
+    db.commit()
+    db.refresh(role)
+
+    user = UserModel(username=username)
+    user.set_password(password)
+    user.roles.append(role)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return user
+
 @pytest.mark.asyncio
 async def test_register_and_login():
     async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
-        # Регистрация
         response = await ac.post(
             "/register",
             data={
