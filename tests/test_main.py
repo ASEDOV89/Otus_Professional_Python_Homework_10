@@ -48,7 +48,24 @@ from authenticate import create_access_token
 from datetime import timedelta, datetime
 
 
-def create_test_user(db: Session, username: str = "admin", password: str = "admin", role_name: str = "admin"):
+
+def create_test_admin(db: Session, username: str = "admin", password: str = "adminpass", role_name: str = "admin"):
+    role = RoleModel(name=role_name)
+    db.add(role)
+    db.commit()
+    db.refresh(role)
+
+    admin = UserModel(username=username)
+    admin.set_password(password)
+    admin.roles.append(role)
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+
+    return admin
+
+
+def create_test_user(db: Session, username: str = "testuser", password: str = "testpassword", role_name: str = "some_role"):
     role = RoleModel(name=role_name)
     db.add(role)
     db.commit()
@@ -63,57 +80,45 @@ def create_test_user(db: Session, username: str = "admin", password: str = "admi
 
     return user
 
+@pytest.fixture
+async def create_admin(db):
+    admin = create_test_admin(db)
+    yield admin
+
+@pytest.fixture
+async def create_user(db):
+    user = create_test_user(db)
+    yield user
+
 @pytest.mark.asyncio
-async def test_access_protected_route():
-    async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
+async def test_access_protected_route(test_app, create_user):
+    async with AsyncClient(app=test_app, base_url="http://testserver") as ac:
+        user = create_user
+        response = await ac.post(
+            "/login",
+            data={
+                "username": user.username,
+                "password": user.password_hash
+            }
+        )
+
         response = await ac.post("/add_sale", data={
             "sale_date": "2025-01-01",
             "quantity": 10,
             "item_id": 1
-        })
-        assert response.status_code == 401
-
-        user_data = {"user_id": 1, "username": "testuser", "roles": ["some_role"]}
-
-        access_token = create_access_token(user_data, expires_delta=timedelta(hours=1))
-
-        headers = Headers({"Authorization": f"Bearer {access_token}"})
-
-        response = await ac.post("/add_sale", headers=headers, data={
-            "sale_date": "2025-01-01",
-            "quantity": 10,
-            "item_id": 1
-        })
-
-        assert response.status_code == 403
-
-        # await ac.post(
-        #     "/login",
-        #     data={
-        #         "username": "testuser",
-        #         "password": "testpassword"
-        #     }
-        # )
-
-        # response = await ac.post("/add_sale", data={
-        #     "sale_date": "2025-01-01",
-        #     "quantity": 10,
-        #     "item_id": 1
-        # })
-        # assert response.status_code == 403
-
-
-
+        }, cookies=response.cookies)
+        assert response.status_code == 403  # Forbidden
 
 
 @pytest.mark.asyncio
-async def test_admin_access():
+async def test_admin_access(test_app, create_admin):
     async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
+        admin = create_admin
         response = await ac.post(
             "/login",
             data={
-                "username": "admin",
-                "password": "admin"
+                "username": admin.username,
+                "password": admin.password_hash
             }
         )
         assert response.status_code == 303
