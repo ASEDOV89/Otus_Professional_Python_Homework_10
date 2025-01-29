@@ -91,8 +91,8 @@ async def create_user(db):
     yield user
 
 @pytest.mark.asyncio
-async def test_access_protected_route(test_app, create_user):
-    async with AsyncClient(app=test_app, base_url="http://testserver") as ac:
+async def test_access_protected_route(create_user):
+    async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
         user = create_user
         response = await ac.post(
             "/login",
@@ -111,7 +111,7 @@ async def test_access_protected_route(test_app, create_user):
 
 
 @pytest.mark.asyncio
-async def test_admin_access(test_app, create_admin):
+async def test_admin_access(create_admin):
     async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
         admin = create_admin
         response = await ac.post(
