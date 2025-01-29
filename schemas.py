@@ -18,7 +18,7 @@ class User(UserBase):
     roles: List[str] = []
 
     class Config:
-        from_attributes=True
+        from_attributes = True
 
 
 class SaleCreate(BaseModel):

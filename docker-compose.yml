@@ -25,36 +25,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app  # Монтируем текущую директорию в /app контейнера
+      - .:/app
 
 volumes:
   postgres_data:
-
-
-#version: '3.8'
-#
-#services:
-#  db:
-#    image: postgres:13
-#    restart: always
-#    environment:
-#      POSTGRES_USER: yourusername
-#      POSTGRES_PASSWORD: yourpassword
-#      POSTGRES_DB: yourdatabase
-#    volumes:
-#      - postgres_data:/var/lib/postgresql/data
-#    ports:
-#      - "5432:5432"
-#
-#  web:
-#    build: .
-#    restart: always
-#    depends_on:
-#      - db
-#    environment:
-#      DATABASE_URL: postgresql://yourusername:yourpassword@db:5432/yourdatabase
-#    ports:
-#      - "8000:8000"
-#
-#volumes:
-#  postgres_data:
+:

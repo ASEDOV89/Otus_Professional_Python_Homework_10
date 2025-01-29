@@ -138,9 +138,9 @@ def add_sale(
 
 @app.post("/sales")
 def create_sale(
-        sale: SaleCreate,
-        db: Session = Depends(get_db),
-        current_user: UserModel = Depends(get_current_user),
+    sale: SaleCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
 ):
     if not current_user or "admin" not in get_user_roles(current_user):
         raise HTTPException(status_code=403, detail="Недостаточно прав")
