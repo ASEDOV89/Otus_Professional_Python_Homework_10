@@ -115,28 +115,6 @@ def read_root(
     )
 
 
-# @app.get("/", response_class=HTMLResponse)
-# def read_root(request: Request, db: Session = Depends(get_db)):
-#     forecast_list = forecast_with_dynamic_features(db)
-#
-#     past_sales = db.query(Sale).order_by(desc(Sale.sale_date)).limit(20).all()
-#
-#     past_sales_list = [
-#         {
-#             "item_id": sale.item_id,
-#             "date": sale.sale_date.strftime("%Y-%m-%d"),
-#             "quantity": sale.quantity,
-#         }
-#         for sale in past_sales
-#     ]
-#
-#     return templates.TemplateResponse(
-#         request,
-#         "index.html",
-#         {"forecast": forecast_list, "past_sales": past_sales_list},
-#     )
-
-
 @app.post("/add_sale")
 def add_sale(
     sale_date: str = Form(...),
@@ -159,7 +137,13 @@ def add_sale(
 
 
 @app.post("/sales")
-def create_sale(sale: SaleCreate, db: Session = Depends(get_db)):
+def create_sale(
+        sale: SaleCreate,
+        db: Session = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
+):
+    if not current_user or "admin" not in get_user_roles(current_user):
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
     db_sale = Sale(
         sale_date=sale.sale_date.date(),
         quantity=sale.quantity,

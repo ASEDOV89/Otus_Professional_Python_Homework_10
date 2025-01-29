@@ -42,94 +42,123 @@ async def test_register_and_login():
 
 #==========================================
 
-from sqlalchemy.orm import Session
-from models import UserModel, RoleModel
-from authenticate import create_access_token
-from datetime import timedelta, datetime
+import pytest
+from httpx import AsyncClient
+from asgi_lifespan import LifespanManager
+from app import app, get_db
+from app.models import UserModel, RoleModel, SaleCreate, Sale
+from app.dependencies import get_current_user
 
 
-
-def create_test_admin(db: Session, username: str = "admin", password: str = "adminpass", role_name: str = "admin"):
-    role = RoleModel(name=role_name)
-    db.add(role)
-    db.commit()
-    db.refresh(role)
-
-    admin = UserModel(username=username)
-    admin.set_password(password)
-    admin.roles.append(role)
-    db.add(admin)
-    db.commit()
-    db.refresh(admin)
-
-    return admin
+@pytest.fixture
+async def async_client():
+    async with AsyncClient(app=app, base_url="http://testserver") as ac:
+        yield ac
 
 
-def create_test_user(db: Session, username: str = "testuser", password: str = "testpassword", role_name: str = "some_role"):
-    role = RoleModel(name=role_name)
-    db.add(role)
-    db.commit()
-    db.refresh(role)
+@pytest.fixture
+async def test_db(db: Session):
+    # Настройка базы данных для тестов
+    yield db
+    # Очистка базы данных после тестов, если это нужно
 
-    user = UserModel(username=username)
-    user.set_password(password)
-    user.roles.append(role)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
 
+@pytest.fixture
+async def admin_role(test_db):
+    role = RoleModel(name="admin")
+    test_db.add(role)
+    test_db.commit()
+    return role
+
+
+@pytest.fixture
+async def user_role(test_db):
+    role = RoleModel(name="user")
+    test_db.add(role)
+    test_db.commit()
+    return role
+
+
+@pytest.fixture
+async def admin_user(test_db, admin_role):
+    user = UserModel(username="admin", email="admin@example.com", password_hash="")
+    user.set_password("adminpassword")
+    user.roles.append(admin_role)
+    test_db.add(user)
+    test_db.commit()
     return user
 
-@pytest.fixture
-async def create_admin(db: Session):
-    admin = create_test_admin(db)
-    yield admin
 
 @pytest.fixture
-async def create_user(db: Session):
-    user = create_test_user(db)
-    yield user
+async def normal_user(test_db, user_role):
+    user = UserModel(username="user", email="user@example.com", password_hash="")
+    user.set_password("userpassword")
+    user.roles.append(user_role)
+    test_db.add(user)
+    test_db.commit()
+    return user
 
-@pytest.mark.asyncio
-async def test_access_protected_route(create_user):
-    async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
-        user = create_user
-        response = await ac.post(
-            "/login",
-            data={
-                "username": user.username,
-                "password": user.password_hash
-            }
-        )
 
-        response = await ac.post("/add_sale", data={
-            "sale_date": "2025-01-01",
-            "quantity": 10,
-            "item_id": 1
-        }, cookies=response.cookies)
-        assert response.status_code == 403  # Forbidden
+def mock_get_current_user(user):
+    return user
 
 
 @pytest.mark.asyncio
-async def test_admin_access(create_admin):
-    async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
-        admin = create_admin
-        response = await ac.post(
-            "/login",
-            data={
-                "username": admin.username,
-                "password": admin.password_hash
-            }
-        )
-        assert response.status_code == 303
+async def test_create_sale_success(async_client, test_db, admin_user, monkeypatch):
+    sale_data = {
+        "sale_date": "2025-01-01",
+        "quantity": 10,
+        "item_id": 1,
+    }
 
-        response = await ac.post("/add_sale", data={
+    # Подменяем зависимость get_current_user на mock-функцию для администратора
+    monkeypatch.setattr("app.dependencies.get_current_user", lambda: admin_user)
+
+    response = await async_client.post("/sales", json=sale_data)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "message": "Продажа успешно добавлена.",
+        "sale": {
             "sale_date": "2025-01-01",
             "quantity": 10,
-            "item_id": 1
-        })
-        assert response.status_code == 303
+            "item_id": 1,
+        },
+    }
 
-        response = await ac.get("/", cookies=response.cookies)
-        assert "2025-01-01" in response.text
+    # Проверка, что запись была добавлена в базу данных
+    sale = test_db.query(Sale).filter_by(item_id=1).first()
+    assert sale is not None
+    assert sale.sale_date == sale_data["sale_date"]
+    assert sale.quantity == sale_data["quantity"]
+
+
+@pytest.mark.asyncio
+async def test_create_sale_forbidden(async_client, test_db, normal_user, monkeypatch):
+    sale_data = {
+        "sale_date": "2025-01-01",
+        "quantity": 10,
+        "item_id": 1,
+    }
+
+    # Подменяем зависимость get_current_user на mock-функцию для обычного пользователя
+    monkeypatch.setattr("app.dependencies.get_current_user", lambda: normal_user)
+
+    response = await async_client.post("/sales", json=sale_data)
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Недостаточно прав"}
+
+
+@pytest.mark.asyncio
+async def test_create_sale_unauthorized(async_client):
+    sale_data = {
+        "sale_date": "2025-01-01",
+        "quantity": 10,
+        "item_id": 1,
+    }
+
+    response = await async_client.post("/sales", json=sale_data)
+
+    assert response.status_code == 401  # Unauthorized
 
