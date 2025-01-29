@@ -10,9 +10,39 @@ from httpx import AsyncClient, ASGITransport, Headers
 from main import app
 
 
+# @pytest.mark.asyncio
+# async def test_register_and_login():
+#     async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
+#         response = await ac.post(
+#             "/register",
+#             data={
+#                 "username": "testuser",
+#                 "email": "testuser@example.com",
+#                 "password": "testpassword"
+#             }
+#         )
+#         assert response.status_code == 303
+#
+#         response = await ac.post(
+#             "/login",
+#             data={
+#                 "username": "testuser",
+#                 "password": "testpassword"
+#             }
+#         )
+#         assert response.status_code == 303
+#
+#         cookies = response.cookies.jar
+#         assert any(cookie.name == "access_token" for cookie in cookies)
+#
+#         response = await ac.get("/", cookies=response.cookies)
+#         assert response.status_code == 200
+#         assert "Привет, testuser" in response.text
+
 @pytest.mark.asyncio
 async def test_register_and_login():
     async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
+        # Регистрация пользователя
         response = await ac.post(
             "/register",
             data={
@@ -23,6 +53,7 @@ async def test_register_and_login():
         )
         assert response.status_code == 303
 
+        # Логин пользователя
         response = await ac.post(
             "/login",
             data={
@@ -32,13 +63,17 @@ async def test_register_and_login():
         )
         assert response.status_code == 303
 
+        # Получение cookies
         cookies = response.cookies.jar
         assert any(cookie.name == "access_token" for cookie in cookies)
 
-        response = await ac.get("/", cookies=response.cookies)
+        # Установка cookies на уровне клиента
+        ac.cookies.update(response.cookies)
+
+        # Запрос с установленными cookies
+        response = await ac.get("/")
         assert response.status_code == 200
         assert "Привет, testuser" in response.text
-
 
 #
 # @pytest.fixture
