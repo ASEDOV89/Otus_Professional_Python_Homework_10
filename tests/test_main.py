@@ -45,22 +45,23 @@ async def test_register_and_login():
 import pytest
 from httpx import AsyncClient
 from asgi_lifespan import LifespanManager
-from app import app, get_db
-from app.models import UserModel, RoleModel, SaleCreate, Sale
-from app.dependencies import get_current_user
+from main import app
+from database import get_db
+from models import UserModel, RoleModel, Sale
+from schemas import SaleCreate
+from authenticate import get_current_user
+from sqlalchemy.orm import Session
 
 
 @pytest.fixture
 async def async_client():
-    async with AsyncClient(app=app, base_url="http://testserver") as ac:
+    async with AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as ac:
         yield ac
 
 
 @pytest.fixture
 async def test_db(db: Session):
-    # Настройка базы данных для тестов
     yield db
-    # Очистка базы данных после тестов, если это нужно
 
 
 @pytest.fixture
@@ -111,7 +112,6 @@ async def test_create_sale_success(async_client, test_db, admin_user, monkeypatc
         "item_id": 1,
     }
 
-    # Подменяем зависимость get_current_user на mock-функцию для администратора
     monkeypatch.setattr("app.dependencies.get_current_user", lambda: admin_user)
 
     response = await async_client.post("/sales", json=sale_data)
@@ -126,7 +126,6 @@ async def test_create_sale_success(async_client, test_db, admin_user, monkeypatc
         },
     }
 
-    # Проверка, что запись была добавлена в базу данных
     sale = test_db.query(Sale).filter_by(item_id=1).first()
     assert sale is not None
     assert sale.sale_date == sale_data["sale_date"]
@@ -141,7 +140,6 @@ async def test_create_sale_forbidden(async_client, test_db, normal_user, monkeyp
         "item_id": 1,
     }
 
-    # Подменяем зависимость get_current_user на mock-функцию для обычного пользователя
     monkeypatch.setattr("app.dependencies.get_current_user", lambda: normal_user)
 
     response = await async_client.post("/sales", json=sale_data)
@@ -160,5 +158,5 @@ async def test_create_sale_unauthorized(async_client):
 
     response = await async_client.post("/sales", json=sale_data)
 
-    assert response.status_code == 401  # Unauthorized
+    assert response.status_code == 401
 
