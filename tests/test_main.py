@@ -81,12 +81,12 @@ def create_test_user(db: Session, username: str = "testuser", password: str = "t
     return user
 
 @pytest.fixture
-async def create_admin(db):
+async def create_admin(db: Session):
     admin = create_test_admin(db)
     yield admin
 
 @pytest.fixture
-async def create_user(db):
+async def create_user(db: Session):
     user = create_test_user(db)
     yield user
 
