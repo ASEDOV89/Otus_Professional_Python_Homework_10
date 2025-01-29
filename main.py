@@ -105,9 +105,9 @@ def read_root(
     ]
 
     return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
+        request=request,
+        name="index.html",
+        context={
             "forecast": forecast_list,
             "past_sales": past_sales_list,
             "current_user": current_user,
